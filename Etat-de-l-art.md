@@ -48,7 +48,9 @@ Défauts :
 Packages à explorer : -
 <a href="https://github.com/SeojinBang/MKKC" class="uri">https://github.com/SeojinBang/MKKC</a>
 (<a href="https://arxiv.org/pdf/1803.02458.pdf" class="uri">https://arxiv.org/pdf/1803.02458.pdf</a>)
-: RMKKM mais pas le même que celui de l’article cité plus haut.
+(R) : RMKKM mais pas le même que celui de l’article cité plus haut. -
+<a href="https://github.com/csliangdu/RMKKM" class="uri">https://github.com/csliangdu/RMKKM</a>
+(Matlab) : RMKKM de l’article, avec les codes pour AASC, KKM, SC, etc.
 
 ### Spectral Clustering with Multiple Kernels (SCMK) :
 
