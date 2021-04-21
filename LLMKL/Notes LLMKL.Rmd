@@ -1,0 +1,146 @@
+
+---
+title: "Notes LLMKL"
+author: "Kylliann De Santiago"
+output:
+  beamer_presentation: default
+  ioslides_presentation: default
+  slidy_presentation: default
+---
+
+
+```{r, include=FALSE}
+options(tinytex.verbose = TRUE)
+```
+
+## Idées de la méthode : 
+
+- L'idée est de combiner un maximum de méthodes afin d'extraire le plus d'information possible.
+- La méthode `LLMKL` se base sur : "self-expressivenes graph", Structure globale des données, structure de graphe locale, Noyaux Consensus.
+
+- Objectif : Construire une matrice d'affinité `Z` qui permettra de faire un clustering efficace à partir de ces différents axes.
+
+##  self-expressiveness graph
+
+- L'idée : Construire une matrice d'affinité `Z` qui associera de grandes valeurs aux observations du même sous-espace.
+- On cherche `Z` tel que :
+$$ 
+\underset{Z}{\text{min}} \ \frac{1}{2}||X-XZ||^2_F \; +\alpha R(Z) ,\ \text{où} \ Z \geq 0, \ \text{diag}(Z) = 0
+$$
+
+On rappelle que :
+$$
+<A,B>_F=\text{Tr}(A^*B)=\text{Tr}(BA^*) \ \text{et} ||A||^2_F = \text{Tr}(A^*A)
+$$
+Avec cette formulation, nous saisissons mal les données non linéaire, on peut reformuler le problème ainsi :
+$$ 
+\underset{Z}{\text{min}} \ \frac{1}{2}||\phi(X)-\phi(X)Z||^2_F \; +\alpha R(Z)
+$$
+où $\ Z \geq 0, \ \text{diag}(Z) = 0$ et $\phi$ est une fonction noyau.
+
+---
+$$ 
+\underset{Z}{\text{min}} \ \frac{1}{2}||\phi(X)-\phi(X)Z||^2_F \; +\alpha R(Z) 
+$$
+
+En développant la norme :
+$$ 
+\underset{Z}{\text{min}} \ ||\phi(X)||^2_F \ + <\phi(X),\phi(X)Z>_F + \ ||\phi(X)Z||^2_F  \; +\alpha R(Z)
+$$
+D'où :
+$$ 
+\underset{Z}{\text{min}} \ \text{Tr}[\phi(X)^T\phi(X)] \ + 2\ \text{Tr}(\phi(X)^T\phi(X)Z) + \ \text{Tr}[(\phi(X)Z)^T\phi(X)Z]  \; +\alpha R(Z)
+$$
+
+Finalement :
+$$ 
+\underset{Z}{\text{min}} \ \text{Tr}(H \ + 2\ HZ + \ Z^THZ)  \; +\alpha R(Z)
+$$
+
+s.c. $\ Z \geq 0, \ \text{diag}(Z) = 0$.
+
+On notera que $\phi(X)^T\phi(X) = H$, $X \in \mathbb{R}^{p \times n}$ et $H \in \mathbb{R}^{n \times n}$
+
+## Global structure
+
+- On souhaite que $H$ soit de faible rang. On impose donc en plus un coefficient : $$\beta||\phi(X)||_{*}$$ 
+
+- Puisque $H =\phi(X)^T\phi(X)$ alors rang($H$)=rang($\phi(X)$). Donc, minimiser $||\phi(X)||_{*}$ équivaut à minimiser $||H||_{*}$
+
+<!-- - $||H||_{*}$ = $\text{Tr}\sqrt{H^TH}$ = $\text{Tr}(\phi(X)^T\phi(X))$=$||\phi(X)||^2_F$. -->
+
+- De plus, $H$ est une matrice symmétrique et semi-définie positive alors $\exists B, H=B^TB$
+
+- Donc, minimiser $||H||_{*}$ revient à minimiser $||B||_{*}$.
+
+<!-- - où $||B||_{*}$ = $||\phi(X)||_{*}$. -->
+
+La matrice $B$ peut capturer la structure globale des données dans l'espace engendré par $H$. 
+
+Notre matrice d'affinité devient donc :
+$$
+\underset{Z,B}{\text{min}} \ \text{Tr}(H \ + 2\ HZ + \ Z^THZ)  \; +\alpha R(Z) +\beta ||B||_{*}
+$$
+s.c. $\ Z \geq 0, \ \text{diag}(Z) = 0, B^TB=H$.
+
+## Local structure
+
+L'idée de cette partie est derajouter une nouvelle pénalisation à partir d'un coefficient directement relié à la structure locale des données.
+
+On commence par définir le graphe complet $D$ tel que $D_{ij}=||X_i-X_j||^2_2$ où chaque individu est considéré comme un noeud, et chaque lien entre deux noeud correspond à l'affinité entre les deux individus.
+
+On définit :
+$$
+R(Z)= \underset{Z}{\text{min}} \sum^n_{i,j=1}||X_i-X_j||^2_2 Z_{ij}
+$$
+
+$$
+R(Z)= \underset{Z}{\text{min}} \sum^n_{i=1}  \sum^n_{j=1}D_{ij} Z_{ij}
+$$
+
+
+<!-- $$ -->
+<!-- R(Z)= \underset{Z}{\text{min}} \sum^n_{i=1}  \sum^n_{j=1}D^T_{ji} Z_{ij} -->
+<!-- $$ -->
+
+<!-- $$ -->
+<!-- R(Z)= \underset{Z}{\text{min}}\  \text{Tr}(ZD^T) -->
+<!-- $$ -->
+Donc :
+$$
+R(Z)= \underset{Z}{\text{min}}\ \text{Tr}(D^TZ)
+$$
+
+## Consensus Kernel
+
+L'idée de cette partie est de terminer un noyaux consensus $H$ proche du mélange de `r`noyaux : $\{H_i\}_1^r$.
+
+Autrement dit, on souhaite trouver H tel que (MKL weighting strategy) :
+
+$$
+\underset{H,g}{\text{min}}\ || H -\sum^r_{i=1}g_iH_i||^2_F
+$$
+s.c. $g_i \geq0$ et $\sum^r_{i=1}g_i=1$
+
+## Fonction d'objectif :
+
+Une autre idée a été de décomposer $H$ tel que $H=B^TB+E$ où $E$ est une matrice de bruit.
+
+En aggrégeant les idées, on aboutit à la fonction d'objectif suivante :
+
+$$
+\begin{aligned}
+\underset{Z,B,H,E,g}{\text{min}} \ \text{Tr}[(I \ + 2Z + \ Z^TZ)B^TB]  \; 
++ \lambda_1||B||_{*}\\
++ \lambda_3 \text{Tr}(D^TZ)
++ \frac{\lambda_2}{2}|| H -\sum^r_{i=1}g_iH_i||^2_F
++ \lambda_4 ||E||_1 
+\end{aligned}
+$$
+s.c. $Z>0$, $gi \geq0$, $\sum^r_{i=1}g_i=1$, $H=B^TB+E$, $\text{diag}(Z)=0$, $Z^T1=1$ (1 vectoriel). 
+
+## Résumé :
+![](methode LLMKL)
+
+## Algorithme :
+![](algo LLMKL ADMM)
