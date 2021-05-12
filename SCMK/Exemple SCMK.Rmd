@@ -1,0 +1,609 @@
+---
+title: "Exemple SCMK"
+output: html_notebook
+---
+
+# Chargement des librairies et des fonctions
+
+## Chargement des library
+```{r}
+rm(list=ls())
+library(orthoDr)
+library(pracma)
+library(quadprog)
+library(aricode) 
+library(fossil)
+```
+
+## Clustering
+
+```{r}
+fun<-function(P,args){
+    res = args$beta * Trace(t(P) %*% args$L %*% P) + args$gamma * base::norm(args$F1 - P %*% args$Q,type='F')^2
+    return(res)
+}
+
+grad<-function(P,args){
+    res = 2*args$beta * args$L %*% P - 2 * args$gamma * args$F1 %*% t(args$Q) 
+    return(res)
+}
+```
+
+```{r}
+SCMK <- function(Kernel,c=3,alpha=1,beta=1,gamma=1,mu=1,nb_etape=200,tol=1e-3){
+    #Kernel : tensor with dim(n,n,r) where Kernel[:,:,k] is the kernel k on Kernel
+    # c : number of cluster 
+    
+    
+    # Initialisation des variables 
+    if(length(dim(Kernel))==2){
+        r = 1
+        n = dim(Kernel)[1]
+    }
+    else {
+        r = dim(Kernel)[3]
+        n = dim(Kernel)[1]
+    }
+    Z = matrix(runif(n*n,0,1),nrow=n,ncol=n)
+    P = gramSchmidt( matrix(runif(n*c,0,1),nrow=n,ncol=c))$Q
+    Q = gramSchmidt( matrix(runif(c*c,0,1),nrow=c,ncol=c))$Q
+    F1 = P %*% Q
+    
+    list_argmax=max.col(F1)#donne liste indice du max par ligne
+    for (i in 1:n){
+        F1[i,list_argmax[i]] = 1
+        F1[i,-list_argmax[i]] = 0
+    }
+    F_init=F1
+    Y = matrix(0,nrow=n,ncol=n) 
+    w = matrix(1,nrow=r,ncol=1)/(r^2) ## On veut que sum(sqrt(w))=1
+    
+    etape=1
+    
+    
+    S = matrix(0,nrow=n,ncol=n)
+    h = matrix(1,nrow=r,ncol=1)
+    
+    while( (etape<nb_etape+1) & (base::norm(Z-S,type='F') > base::norm(Z,type='F')*tol) ){
+        #print(etape)
+        #''' Calcul de Kw '''
+        Kw = matrix(0,nrow=n,ncol=n)
+        
+        if(r==1) {
+            Kw = Kernel
+        }
+        else {
+            for (i in 1:r) Kw = Kw + w[i]*Kernel[,,i]
+        }
+
+       #  Update de S 
+         S = Z-Y/mu
+         S[abs(S)<alpha/mu] = alpha/mu
+         S = (abs(S)-alpha/mu) * sign(S)
+         S = S-diag(diag(S))
+         S[S<0]=0
+        
+       # Update de Z 
+        E = S + Y/mu
+        dist_p = (P^2) %*% matrix(1,nrow=c,ncol=n) - 2 * P %*% t(P) + matrix(1,nrow=n,ncol=c) %*% t(P^2) # ||P_i,: - P_j,:||^2
+        tmp1 = mu*diag(n) + 2*Kw
+        tmp2 = beta/2 * dist_p - 2* Kw - mu * E # voir si c'est E ou t(E) matlab
+        Z = solve(tmp1) %*% (-tmp2)
+        Z = Z - diag(diag(Z))
+        Z[Z<0] = 0
+        Z = (Z+t(Z))/2
+        
+        # Update de Y 
+        Y = Y + mu * (S-Z)
+        
+       #  Update de P 
+        D = diag(rowSums(Z))
+        L = D - Z
+        args=list('L'=L,'F1'=F1,'Q'=Q,'beta'=beta,'gamma'=gamma)
+        P = ortho_optim(P,fun,grad=grad,args= args,verbose = FALSE)$B
+        
+        # Update de Q 
+        decomposition = svd(t(F1) %*% P)
+        Q = decomposition$u %*% t(decomposition$v)
+        
+       #  Update de F 
+        F1 = P %*% Q
+        list_argmax=max.col(F1) #donne liste indice du max par ligne
+        for (i in 1:n){
+            F1[i,list_argmax[i]] = 1
+            F1[i,-list_argmax[i]] = 0
+        }
+        if(r>1){
+            #''' Calcul de h '''
+            for (i in 1:r) h[i] = Trace( Kernel[,,i] - 2*Kernel[,,i]%*%Z + t(Z) %*% Kernel[,,i] %*%Z )
+
+            #''' Update de w '''
+            for (i in 1 : r) w[i] = (h[i] * sum(1./h))^(-2)
+        }
+        etape=etape+1
+        #print(dist_p)
+    }
+    #print(Z)
+    #print(S)
+    output=list("pred"=list_argmax,"Z"=Z,'K'=Kw,'w'=w,'P'=P,'F'=F1,'F_init'=F_init)
+    return(output)
+}
+```
+
+```{r}
+Self_expressiveness <- function(Kernel,alpha=1,mu=1,nb_etape=200,tol=1e-3){
+    #Kernel : tensor with dim(n,n,r) where Kernel[:,:,k] is the kernel k on Kernel
+    
+    
+    # Initialisation des variables 
+    if(length(dim(Kernel))==2){
+        r = 1
+        n = dim(Kernel)[1]
+    }
+    else {
+        r = dim(Kernel)[3]
+        n = dim(Kernel)[1]
+    }
+    Z = matrix(runif(n*n,0,1),nrow=n,ncol=n)
+    
+    Y = matrix(0,nrow=n,ncol=n)
+    w = matrix(1,nrow=r,ncol=1)/(r^2) ## On veut que sum(sqrt(w))=1
+    
+    etape=1
+    
+    
+    S = matrix(0,nrow=n,ncol=n)
+    h = matrix(1,nrow=r,ncol=1)
+    
+    while( (etape<nb_etape+1) & (base::norm(Z-S,type='F') > base::norm(Z,type='F')*tol) ){
+        #''' Calcul de Kw '''
+        Kw = matrix(0,nrow=n,ncol=n)
+        
+        if(r==1) {
+            Kw = Kernel
+        }
+        else {
+            for (i in 1:r) Kw = Kw + w[i]*Kernel[,,i]
+        }
+
+       #  Update de S 
+         S = Z-Y/mu
+         S[abs(S)<alpha/mu] = alpha/mu
+         S = (abs(S)-alpha/mu) * sign(S)
+         S = S-diag(diag(S))
+         S[S<0]=0
+        
+       # Update de Z 
+        E = S + Y/mu
+        tmp1 = mu*diag(n) + 2*Kw
+        tmp2 = - 2* Kw - mu * E
+        Z = solve(tmp1) %*% (-tmp2)
+        
+        Z = Z - diag(diag(Z))
+        Z[Z<0] = 0
+        Z = (Z+t(Z))/2
+        
+        # Update de Y 
+        Y = Y + mu * (S-Z)
+        
+        if(r>1){
+            #''' Calcul de h '''
+            for (i in 1:r) h[i] = Trace( Kernel[,,i] - 2*Kernel[,,i]%*%Z + t(Z) %*% Kernel[,,i] %*%Z )
+
+            #''' Update de w '''
+            for (i in 1 : r) w[i] = (h[i] * sum(1./h))^(-2)
+        }
+        etape=etape+1
+    }
+    output=list("Z"=Z,'K'=Kw,'w'=w)
+    return(output)
+}
+
+specc_adjacence<-function(X, c){
+  n=nrow(X)
+  L = diag(rowSums(X)) - X
+  P = svd(L)
+  P = P$u[,(n-c+1):n]
+  for (i in 1:nrow(P))
+  {
+      P[i,]=P[i,]/sqrt(sum(P[i,]^2))
+  }
+  res=kmeans(P,3,nstart=30)
+  return(res$cluster)
+}
+```
+
+```{r}
+SCMK_KMEANS <- function(Kernel,c=3,alpha=1,beta=1,mu=1,nb_etape=200,tol=1e-3){
+    #Kernel : tensor with dim(n,n,r) where Kernel[:,:,k] is the kernel k on Kernel
+    # c : number of cluster 
+    
+    
+    # Initialisation des variables 
+    if(length(dim(Kernel))==2){
+        r = 1
+        n = dim(Kernel)[1]
+    }
+    else {
+        r = dim(Kernel)[3]
+        n = dim(Kernel)[1]
+    }
+    Z = matrix(runif(n*n,0,1),nrow=n,ncol=n)
+    P = gramSchmidt( matrix(runif(n*c,0,1),nrow=n,ncol=c))$Q
+    
+    F1 = zeros(n,c)
+    res=kmeans(P,c)$cluster
+    for (i in 1:n){
+        F1[i,res[i]] = 1
+    }
+    
+    Y = matrix(0,nrow=n,ncol=n)
+    w = matrix(1,nrow=r,ncol=1)/(r^2) ## On veut que sum(sqrt(w))=1
+    
+    etape=1
+    
+    
+    S = matrix(0,nrow=n,ncol=n)
+    h = matrix(1,nrow=r,ncol=1)
+    
+    while( (etape<nb_etape+1) & (base::norm(Z-S,type='F') > base::norm(Z,type='F')*tol) ){
+        #print(etape)
+        #''' Calcul de Kw '''
+        Kw = matrix(0,nrow=n,ncol=n)
+        
+        if(r==1) {
+            Kw = Kernel
+        }
+        else {
+            for (i in 1:r) Kw = Kw + w[i]*Kernel[,,i]
+        }
+
+       #  Update de S 
+         S = Z-Y/mu
+         S[abs(S)<alpha/mu] = alpha/mu
+         S = (abs(S)-alpha/mu) * sign(S)
+         S = S-diag(diag(S))
+         S[S<0]=0
+        
+       # Update de Z 
+        E = S + Y/mu
+        dist_p = (P^2) %*% matrix(1,nrow=c,ncol=n) - 2 * P %*% t(P) + matrix(1,nrow=n,ncol=c) %*% t(P^2) # ||P_i,: - P_j,:||^2
+        tmp1 = mu*diag(n) + 2*Kw
+        tmp2 = beta/2 * dist_p - 2* Kw - mu * E
+        Z = solve(tmp1) %*% (-tmp2)
+        Z = Z - diag(diag(Z))
+        Z[Z<0] = 0
+        Z = (Z+t(Z))/2
+        
+        # Update de Y 
+        Y = Y + mu * (S-Z)
+        
+       #  Update de P 
+        D = diag(rowSums(Z))
+        L = D - Z
+        P = svd(L)
+        P = P$u[,(n-c+1):n]
+        for (i in 1:nrow(P))
+        {
+            P[i,]=P[i,]/sqrt(sum(P[i,]^2))
+        }
+       #  Update de F 
+        res=kmeans(P,c,nstart = 30)$cluster
+        for (i in 1:n){
+            F1[i,res[i]] = 1
+            F1[i,-res[i]] = 0
+        }
+        if(r>1){
+            #''' Calcul de h '''
+            for (i in 1:r) h[i] = Trace( Kernel[,,i] - 2*Kernel[,,i]%*%Z + t(Z) %*% Kernel[,,i] %*%Z )
+
+            #''' Update de w '''
+            for (i in 1 : r) w[i] = (h[i] * sum(1./h))^(-2)
+        }
+        etape=etape+1
+    }
+    output=list("pred"=res,"Z"=Z,'K'=Kw,'w'=w,'P'=P,'F'=F1)
+    return(output)
+}
+```
+
+```{r}
+RBF<-function(X,sigma=1){
+    n=nrow(X)
+    res=matrix(0,n,n)
+    for(i in 1:n){
+        for(j in 1:n){
+            res[i,j]=exp(-sum((X[i,]-X[j,])^2)/(2*sigma))
+        }
+    }
+    return(res)
+}
+
+polynomial<-function(X,deg=1){
+    n=nrow(X)
+    res=matrix(0,n,n)
+    for(i in 1:n){
+        for(j in 1:n){
+            res[i,j]=(t(X[i,])%*%X[j,]+1)^deg
+        }
+    }
+    return(res)
+}
+```
+
+
+## Optimisation hyper-paramètres :
+
+```{r}
+score_grille_hyperparametre_SCMK<-function(Kernel, Y, c=3, range=3, mu=1e3,nb_etape=50,nb_run=1){
+  N_range = 2 * range + 1
+  list_res_NMI <- c()
+  list_res_rand <- c()
+  Mat_res_NMI = zeros(N_range,N_range)
+  Mat_res_rand = zeros(N_range,N_range)
+  
+  tmp_res_NMI = rep(0,nb_run)
+  tmp_res_rand = rep(0,nb_run)
+  for (a in -range:range){
+      for (b in -range:range){
+          for(g in -range:range){
+              print(c(a,b,g))
+              for(x in 1:nb_run){
+                  res=SCMK(Kernel = Kernel,c=c,nb_etape=nb_etape,mu=mu,gamma =10^g,alpha=10^a,beta=10^b)
+                  tmp_res_NMI[x] = NMI(as.vector(Y),as.vector(res$pred))
+                  tmp_res_rand[x] =rand.index(Y,res$pred)
+              }
+              Mat_res_NMI[b+(range+1),g+(range+1)] = mean(tmp_res_NMI)
+              Mat_res_rand[b+(range+1),g+(range+1)] = mean(tmp_res_rand)
+          }
+      }
+      list_res_NMI[[a+(range+1)]]=Mat_res_NMI
+      list_res_rand[[a+(range+1)]]=Mat_res_rand
+  }
+  output = list("score_NMI" = list_res_NMI, "score_rand" = list_res_rand)
+  return(output)
+}
+
+setup_hyperparametre_SCMK <- function(liste, range){
+  N_range=2 * range + 1
+  tmp_res <- c()
+  tmp_index <-c()
+  b <- c()
+  g <- c()
+  for (a in 1:N_range){
+    tmp_res[a] = max(liste[[a]])
+    tmp_index[a] = which.max(liste[[a]])
+    if(tmp_index[[a]] %% N_range != 0){
+      b[a] = tmp_index[[a]] %% N_range # Reste division entière 
+      g[a] = tmp_index[[a]] %/% N_range +1 # Partie entière division
+    }
+    else{
+      b[a] = N_range
+      g[a] = tmp_index[[a]] %/% N_range
+    }
+  }
+  a = which.max(tmp_res)
+  output = list("alpha"=10^(a-(range+1)),"beta"= 10^(b[a]-(range+1)),"gamma" = 10^(g[a]-(range+1)),"score_max" = max(tmp_res))
+  return(output)
+}
+```
+
+
+
+```{r}
+score_grille_hyperparametre_SCMK_KMEANS<-function(Kernel, Y, c=3, range=3, mu=1e3,nb_etape=50,nb_run=1){
+  N_range = 2 * range + 1
+  Mat_res_NMI = zeros(N_range,N_range)
+  Mat_res_rand = zeros(N_range,N_range)
+  
+  tmp_res_NMI = rep(0,nb_run)
+  tmp_res_rand = rep(0,nb_run)
+  for (a in -range:range){
+      for (b in -range:range){
+              print(c(a,b))
+              for(x in 1:nb_run){
+                  res=SCMK_KMEANS(Kernel = Kernel,c=c,nb_etape=nb_etape,mu=mu,alpha=10^a,beta=10^b)
+                  tmp_res_NMI[x] = NMI(as.vector(Y),as.vector(res$pred))
+                  tmp_res_rand[x] =rand.index(Y,res$pred)
+              }
+              Mat_res_NMI[a+(range+1),b+(range+1)] = mean(tmp_res_NMI)
+              Mat_res_rand[a+(range+1),b+(range+1)] = mean(tmp_res_rand)
+      }
+  }
+  output = list("score_NMI" = Mat_res_NMI, "score_rand" = Mat_res_rand)
+  return(output)
+}
+
+setup_hyperparametre_SCMK_KMEANS <- function(liste, range){
+  N_range=2 * range + 1
+  tmp_res = max(liste)
+  tmp_index = which.max(liste)
+  if(tmp_index %% N_range != 0){
+    a = tmp_index %% N_range # Reste division entière 
+    b = tmp_index %/% N_range +1 # Partie entière division
+  }
+  else{
+    a = N_range
+    b = tmp_index %/% N_range
+  }
+  output = list("alpha"=10^(a-(range+1)),"beta"= 10^(b-(range+1)),"score_max" = tmp_res)
+  return(output)
+}
+```
+
+
+```{r}
+hyperparametre_Self_expressiveness<-function(Kernel, Y, c=3, range=3, mu=1e3,nb_etape=50,nb_run=1){
+  N_range = 2 * range + 1
+  Mat_res_NMI = zeros(N_range,1)
+  Mat_res_rand = zeros(N_range,1)
+  tmp_res_NMI = rep(0,nb_run)
+  tmp_res_rand = rep(0,nb_run)
+  for (a in -range:range){
+    print(a)
+    for(x in 1:nb_run){
+        affinity_self=Self_expressiveness(Kernel = Kernel,nb_etape=nb_etape,mu=mu,alpha=10^a)
+        res=specc_adjacence(affinity_self$Z,c = c)
+        tmp_res_NMI[x] = NMI(as.vector(Y),as.vector(res))
+        tmp_res_rand[x] =rand.index(Y,res)
+    }
+    Mat_res_NMI[a+(range+1)] = mean(tmp_res_NMI)
+    Mat_res_rand[a+(range+1)] = mean(tmp_res_rand)
+  }
+  a_NMI=which.max(Mat_res_NMI)
+  a_rand=which.max(Mat_res_rand)
+  output = list("alpha_NMI"=10^(a_NMI-(range+1)),"alpha_rand"=10^(a_rand-(range+1)), "score_max_NMI" = max(Mat_res_NMI) ,"score_max_rand" = max(Mat_res_rand) ,"score_NMI" = Mat_res_NMI, "score_rand" = Mat_res_rand)
+  return(output)
+}
+```
+
+
+# Exemple : 3 gaussiennes - Single Kernel
+## Génération des données 
+
+```{r}
+N_train = 100
+X1=matrix(rnorm(2*N_train),nrow=N_train,ncol=2)
+X2=matrix(rnorm(2*N_train,3),nrow=N_train,ncol=2)
+X3=matrix(rnorm(2*N_train,6),nrow=N_train,ncol=2)
+X_train=as.matrix(rbind(X1,X2,X3))
+Y_train = c(rep(1,N_train),rep(2,N_train),rep(3,N_train))
+```
+
+```{r}
+N_test = 30
+X1=matrix(rnorm(2*N_test),nrow=N_test,ncol=2)
+X2=matrix(rnorm(2*N_test,3),nrow=N_test,ncol=2)
+X3=matrix(rnorm(2*N_test,6),nrow=N_test,ncol=2)
+X_test=as.matrix(rbind(X1,X2,X3))
+Y_test = c(rep(1,N_test),rep(2,N_test),rep(3,N_test))
+```
+
+## Visualisation des données
+
+```{r}
+plot(X_train[,1],X_train[,2], col=Y_train,pch=20)
+plot(X_test[,1],X_test[,2], col=Y_test,pch=3)
+plot(X_train[,1],X_train[,2], col=Y_train,pch=20)
+points(X_test[,1],X_test[,2],col=Y_test,pch=3)
+```
+
+## Construction du Kernel
+
+```{r}
+Kernel_Matrix_train=polynomial(X_train,2)
+#Kernel_Matrix=RBF(X_train,1)
+image(x=1:(N_train*3),y=1:(N_train*3),z=Kernel_Matrix_train)
+```
+
+```{r}
+Kernel_Matrix_test = polynomial(X_test,2)
+image(x=1:((N_test)*3),y=1:((N_test)*3),z=Kernel_Matrix_test)
+```
+
+## Test des performances
+
+```{r}
+range = 3
+mu=1e3
+c=3
+nb_etape = 50
+nb_run = 10
+
+nb_test = 10
+
+
+result_NMI_test<-matrix(0,nrow=nb_test,ncol = 3)
+result_rand_test<-matrix(0,nrow=nb_test,ncol = 3)
+```
+
+```{r}
+# Setup des hyper-paramètres
+tmp=score_grille_hyperparametre_SCMK(Kernel_Matrix_train, Y_train, 3,range,mu,nb_etape = nb_etape ,nb_run = nb_run)
+param_SCMK_rand=setup_hyperparametre_SCMK(tmp$score_rand,range)
+param_SCMK_NMI=setup_hyperparametre_SCMK(tmp$score_NMI,range)
+
+tmp=score_grille_hyperparametre_SCMK_KMEANS(Kernel_Matrix_train, Y_train, 3,range,mu,nb_etape = nb_etape ,nb_run = nb_run)
+param_SCMK_KMEANS_rand = setup_hyperparametre_SCMK_KMEANS(tmp$score_rand,range)
+param_SCMK_KMEANS_NMI = setup_hyperparametre_SCMK_KMEANS(tmp$score_NMI,range)
+
+param_Self=hyperparametre_Self_expressiveness(Kernel_Matrix_train, Y_train, 3,range=3,mu,nb_etape = nb_etape ,nb_run = nb_run)
+
+# Scoring
+for (i in 1:nb_test){
+  print(i)
+  
+  #SCMK_NMI
+  res=SCMK(Kernel = Kernel_Matrix_test, c=c, nb_etape=nb_etape, mu=mu, alpha=param_SCMK_NMI$alpha, beta=param_SCMK_NMI$beta, gamma=param_SCMK_NMI$gamma)
+  result_NMI_test[i,1] <- NMI(as.vector(Y_test),as.vector(res$pred))
+
+  
+   #SCMK_rand
+  res=SCMK(Kernel = Kernel_Matrix_test, c=c, nb_etape=nb_etape, mu=mu, alpha=param_SCMK_rand$alpha, beta=param_SCMK_rand$beta, gamma=param_SCMK_rand$gamma)
+  result_rand_test[i,1] <-rand.index(Y_test,res$pred)
+
+  
+  #SCMK_KMEANS_NMI
+  res=SCMK_KMEANS(Kernel = Kernel_Matrix_test, c=c, nb_etape=nb_etape, mu=mu, alpha=param_SCMK_KMEANS_NMI$alpha, beta=param_SCMK_KMEANS_NMI$beta)
+  result_NMI_test[i,2] <- NMI(as.vector(Y_test),as.vector(res$pred))
+
+  
+   #SCMK_KMEANS_rand
+  res=SCMK_KMEANS(Kernel = Kernel_Matrix_test, c=c, nb_etape=nb_etape, mu=mu, alpha=param_SCMK_KMEANS_rand$alpha, beta=param_SCMK_KMEANS_rand$beta)
+  result_rand_test[i,2] <-rand.index(Y_test,res$pred)
+
+  
+  #Self_expressiveness_NMI
+  affinity_self = Self_expressiveness(Kernel = Kernel_Matrix_test, alpha = param_Self$alpha_NMI, mu = mu, nb_etape = nb_etape, tol = 1e-3)
+  res = specc_adjacence(affinity_self$Z,c = c)
+  result_NMI_test[i,3] <- NMI(as.vector(Y_test),as.vector(res))
+
+  
+  #Self_expressiveness_rand
+  affinity_self = Self_expressiveness(Kernel = Kernel_Matrix_test, alpha = param_Self$alpha_rand, mu = mu, nb_etape = nb_etape, tol = 1e-3)
+  res = specc_adjacence(affinity_self$Z,c = c)
+  result_rand_test[i,3] <-rand.index(Y_test,res)
+
+}
+```
+
+```{r}
+#png("aze.jpg",height=700,width=700,res=140)
+#dev.off()
+boxplot(result_NMI_full)
+boxplot(result_NMI_test)
+boxplot(result_NMI_train)
+boxplot(result_rand_full)
+boxplot(result_rand_test)
+boxplot(result_rand_train)
+
+```
+
+
+# Exemple : 3 gaussiennes - Multiple Kernels
+
+```{r}
+library(tensorr)
+dims=c(300,300,5)
+Kernels = array(0,dims)
+```
+
+```{r}
+Kernels[,,1] = RBF(X_train,0.1)
+Kernels[,,2] = RBF(X_train,1)
+Kernels[,,3] = RBF(X_train,10)
+Kernels[,,4] = polynomial(X_train,1)
+Kernels[,,5] = polynomial(X_train,2)
+```
+
+```{r}
+res=Self_expressiveness(Kernel = Kernels,alpha = 1,mu=1,nb_etape = 50,tol = 1e-3)
+image(x=1:300,y=1:300,z=res$Z)
+image(x=1:300,y=1:300,z=res$K)
+
+plot(X_train[,1],X_train[,2],col=specc_adjacence(res$Z,c = 3))
+plot(X_train[,1],X_train[,2],col=specc_adjacence(res$K,c = 3))
+```
+
+
+
