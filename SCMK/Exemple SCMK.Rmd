@@ -471,7 +471,7 @@ Y_train = c(rep(1,N_train),rep(2,N_train),rep(3,N_train))
 ```
 
 ```{r}
-N_test = 30
+N_test = 50
 X1=matrix(rnorm(2*N_test),nrow=N_test,ncol=2)
 X2=matrix(rnorm(2*N_test,3),nrow=N_test,ncol=2)
 X3=matrix(rnorm(2*N_test,6),nrow=N_test,ncol=2)
@@ -505,11 +505,10 @@ image(x=1:((N_test)*3),y=1:((N_test)*3),z=Kernel_Matrix_test)
 
 ```{r}
 range = 3
-mu=1e3
-c=3
-nb_etape = 50
-nb_run = 10
 
+c=3
+nb_etape = 1
+nb_run = 1
 nb_test = 10
 
 
@@ -518,64 +517,76 @@ result_rand_test<-matrix(0,nrow=nb_test,ncol = 3)
 ```
 
 ```{r}
-# Setup des hyper-paramètres
-tmp=score_grille_hyperparametre_SCMK(Kernel_Matrix_train, Y_train, 3,range,mu,nb_etape = nb_etape ,nb_run = nb_run)
-param_SCMK_rand=setup_hyperparametre_SCMK(tmp$score_rand,range)
-param_SCMK_NMI=setup_hyperparametre_SCMK(tmp$score_NMI,range)
-
-tmp=score_grille_hyperparametre_SCMK_KMEANS(Kernel_Matrix_train, Y_train, 3,range,mu,nb_etape = nb_etape ,nb_run = nb_run)
-param_SCMK_KMEANS_rand = setup_hyperparametre_SCMK_KMEANS(tmp$score_rand,range)
-param_SCMK_KMEANS_NMI = setup_hyperparametre_SCMK_KMEANS(tmp$score_NMI,range)
-
-param_Self=hyperparametre_Self_expressiveness(Kernel_Matrix_train, Y_train, 3,range=3,mu,nb_etape = nb_etape ,nb_run = nb_run)
-
-# Scoring
-for (i in 1:nb_test){
-  print(i)
+setwd("SCMK - image")
+for( exp_mu in -range:range){
+  mu=10 ^exp_mu  
+  # Setup des hyper-paramètres
+  tmp=score_grille_hyperparametre_SCMK(Kernel_Matrix_train, Y_train, c,range,mu,nb_etape = nb_etape ,nb_run = nb_run)
+  param_SCMK_rand=setup_hyperparametre_SCMK(tmp$score_rand,range)
+  param_SCMK_NMI=setup_hyperparametre_SCMK(tmp$score_NMI,range)
   
-  #SCMK_NMI
-  res=SCMK(Kernel = Kernel_Matrix_test, c=c, nb_etape=nb_etape, mu=mu, alpha=param_SCMK_NMI$alpha, beta=param_SCMK_NMI$beta, gamma=param_SCMK_NMI$gamma)
-  result_NMI_test[i,1] <- NMI(as.vector(Y_test),as.vector(res$pred))
-
+  tmp=score_grille_hyperparametre_SCMK_KMEANS(Kernel_Matrix_train, Y_train, ,range,mu,nb_etape = nb_etape ,nb_run = nb_run)
+  param_SCMK_KMEANS_rand = setup_hyperparametre_SCMK_KMEANS(tmp$score_rand,range)
+  param_SCMK_KMEANS_NMI = setup_hyperparametre_SCMK_KMEANS(tmp$score_NMI,range)
   
-   #SCMK_rand
-  res=SCMK(Kernel = Kernel_Matrix_test, c=c, nb_etape=nb_etape, mu=mu, alpha=param_SCMK_rand$alpha, beta=param_SCMK_rand$beta, gamma=param_SCMK_rand$gamma)
-  result_rand_test[i,1] <-rand.index(Y_test,res$pred)
-
+  param_Self=hyperparametre_Self_expressiveness(Kernel_Matrix_train, Y_train, c,range,mu,nb_etape = nb_etape ,nb_run = nb_run)
   
-  #SCMK_KMEANS_NMI
-  res=SCMK_KMEANS(Kernel = Kernel_Matrix_test, c=c, nb_etape=nb_etape, mu=mu, alpha=param_SCMK_KMEANS_NMI$alpha, beta=param_SCMK_KMEANS_NMI$beta)
-  result_NMI_test[i,2] <- NMI(as.vector(Y_test),as.vector(res$pred))
-
+  # Scoring
+  for (i in 1:nb_test){
+    print(i)
+    
+    #SCMK_NMI
+    res=SCMK(Kernel = Kernel_Matrix_test, c=c, nb_etape=nb_etape, mu=mu, alpha=param_SCMK_NMI$alpha, beta=param_SCMK_NMI$beta, gamma=param_SCMK_NMI$gamma)
+    result_NMI_test[i,1] <- NMI(as.vector(Y_test),as.vector(res$pred))
   
-   #SCMK_KMEANS_rand
-  res=SCMK_KMEANS(Kernel = Kernel_Matrix_test, c=c, nb_etape=nb_etape, mu=mu, alpha=param_SCMK_KMEANS_rand$alpha, beta=param_SCMK_KMEANS_rand$beta)
-  result_rand_test[i,2] <-rand.index(Y_test,res$pred)
-
+    
+     #SCMK_rand
+    res=SCMK(Kernel = Kernel_Matrix_test, c=c, nb_etape=nb_etape, mu=mu, alpha=param_SCMK_rand$alpha, beta=param_SCMK_rand$beta, gamma=param_SCMK_rand$gamma)
+    result_rand_test[i,1] <-rand.index(Y_test,res$pred)
   
-  #Self_expressiveness_NMI
-  affinity_self = Self_expressiveness(Kernel = Kernel_Matrix_test, alpha = param_Self$alpha_NMI, mu = mu, nb_etape = nb_etape, tol = 1e-3)
-  res = specc_adjacence(affinity_self$Z,c = c)
-  result_NMI_test[i,3] <- NMI(as.vector(Y_test),as.vector(res))
-
+    
+    #SCMK_KMEANS_NMI
+    res=SCMK_KMEANS(Kernel = Kernel_Matrix_test, c=c, nb_etape=nb_etape, mu=mu, alpha=param_SCMK_KMEANS_NMI$alpha, beta=param_SCMK_KMEANS_NMI$beta)
+    result_NMI_test[i,2] <- NMI(as.vector(Y_test),as.vector(res$pred))
   
-  #Self_expressiveness_rand
-  affinity_self = Self_expressiveness(Kernel = Kernel_Matrix_test, alpha = param_Self$alpha_rand, mu = mu, nb_etape = nb_etape, tol = 1e-3)
-  res = specc_adjacence(affinity_self$Z,c = c)
-  result_rand_test[i,3] <-rand.index(Y_test,res)
-
+    
+     #SCMK_KMEANS_rand
+    res=SCMK_KMEANS(Kernel = Kernel_Matrix_test, c=c, nb_etape=nb_etape, mu=mu, alpha=param_SCMK_KMEANS_rand$alpha, beta=param_SCMK_KMEANS_rand$beta)
+    result_rand_test[i,2] <-rand.index(Y_test,res$pred)
+  
+    
+    #Self_expressiveness_NMI
+    affinity_self = Self_expressiveness(Kernel = Kernel_Matrix_test, alpha = param_Self$alpha_NMI, mu = mu, nb_etape = nb_etape, tol = 1e-3)
+    res = specc_adjacence(affinity_self$Z,c = c)
+    result_NMI_test[i,3] <- NMI(as.vector(Y_test),as.vector(res))
+  
+    
+    #Self_expressiveness_rand
+    affinity_self = Self_expressiveness(Kernel = Kernel_Matrix_test, alpha = param_Self$alpha_rand, mu = mu, nb_etape = nb_etape, tol = 1e-3)
+    res = specc_adjacence(affinity_self$Z,c = c)
+    result_rand_test[i,3] <-rand.index(Y_test,res)
+  }  
+  name_file_NMI=paste("Boxplot_NMI_Mu",mu,".png",sep = "")
+  name_file_rand=paste("Boxplot_rand_Mu",mu,".png",sep = "")
+  png(name_file_NMI,height=700,width=700,res=140)
+  boxplot(result_NMI_test)
+  dev.off()
+  png(name_file_rand,height=700,width=700,res=140)
+  boxplot(result_rand_test)
+  dev.off()
 }
 ```
 
 ```{r}
 #png("aze.jpg",height=700,width=700,res=140)
 #dev.off()
-boxplot(result_NMI_full)
+
+#boxplot(result_NMI_full)
 boxplot(result_NMI_test)
-boxplot(result_NMI_train)
-boxplot(result_rand_full)
+#boxplot(result_NMI_train)
+#boxplot(result_rand_full)
 boxplot(result_rand_test)
-boxplot(result_rand_train)
+#boxplot(result_rand_train)
 
 ```
 
