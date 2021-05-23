@@ -1,0 +1,244 @@
+---
+title: "Simulations pour clustering"
+output: 
+  pdf_document: default
+---
+
+```{r}
+library(mvtnorm)
+```
+
+```{r}
+simu_melange_norm <-function(n,pi_k,params,z=NULL){
+  # Paramètres
+  K = length(pi_k) #nombre de classes
+  p = length(params[[1]]$mu) #nombre de variables à simuler
+  
+  # Si les groupes sont pas déjà définis, en choisi aléatoirement.
+  if(is.null(z)){
+    z = sample(1:K,n,replace=TRUE,prob=pi_k)
+  }
+  
+  # Si le nombre d'individu de Z est différent de celui que l'on veut générer
+  if(length(z)!=n) {
+    warning("Différence de taille entre n et Z, Z a été pris comme référence")
+    n=length(z)
+  }
+  
+  # Génération des données
+  x = matrix(0,nrow=n,ncol=p)
+  for (k in 1:K){
+    idx = which(z==k)
+    x[idx,] = rmvnorm(length(idx),mean = params[[k]]$mu, sigma = matrix(params[[k]]$sigma,nrow = p))
+  }
+  
+  output = list('x'=x,'z'=z)
+  return(output)
+}
+```
+
+
+```{r}
+simu_melange_bern <-function(n,pi_k,params,z=NULL){
+  
+  #Paramètres
+  K = length(pi_k)
+  p = length(params[[1]])
+  
+  # Si les groupes sont pas déjà définis, en choisi aléatoirement.
+  if(is.null(z)){
+    z = sample(1:K,n,replace=TRUE,prob=pi_k)
+  }
+  
+  # Si le nombre d'individu de Z est différent de celui que l'on veut générer
+  if(length(z)!=n) {
+    warning("Différence de taille entre n et Z, Z a été pris comme référence")
+    n=length(z)
+  }
+  
+  
+  # Génération des données
+  x = matrix(0,nrow=n,ncol=p)
+  for (k in 1:K){
+    idx = which(z==k)
+    for (j in 1:p){
+       x[idx,j] = sample(0:1,size=length(idx),replace=TRUE,prob=c(1-params[[k]][j],params[[k]][j]))
+    }
+  }
+  
+  output = list('x'=x,'z'=z)
+  return(output)
+}
+```
+
+```{r}
+simu_melange_pois <-function(n,pi_k,params,z=NULL){
+  
+  #Paramètres
+  K = length(pi_k)
+  p = length(params[[1]])
+  
+  # Si les groupes sont pas déjà définis, en choisi aléatoirement.
+  if(is.null(z)){
+    z = sample(1:K,n,replace=TRUE,prob=pi_k)
+  }
+  
+  # Si le nombre d'individu de Z est différent de celui que l'on veut générer
+  if(length(z)!=n) {
+    warning("Différence de taille entre n et Z, Z a été pris comme référence")
+    n=length(z)
+  }
+  
+  
+  # Génération des données
+  x = matrix(0,nrow=n,ncol=p)
+  for (k in 1:K){
+    idx = which(z==k)
+    for (j in 1:p){
+       x[idx,j] = rpois(length(idx),params[[k]][j])
+    }
+  }
+  
+  output = list('x'=x,'z'=z)
+  return(output)
+}
+```
+
+```{r}
+simu_melange_exp <-function(n,pi_k,params,z=NULL){
+  
+  #Paramètres
+  K = length(pi_k)
+  p = length(params[[1]])
+  
+  # Si les groupes sont pas déjà définis, en choisi aléatoirement.
+  if(is.null(z)){
+    z = sample(1:K,n,replace=TRUE,prob=pi_k)
+  }
+  
+  # Si le nombre d'individu de Z est différent de celui que l'on veut générer
+  if(length(z)!=n) {
+    warning("Différence de taille entre n et Z, Z a été pris comme référence")
+    n=length(z)
+  }
+  
+  
+  # Génération des données
+  x = matrix(0,nrow=n,ncol=p)
+  for (k in 1:K){
+    idx = which(z==k)
+    for (j in 1:p){
+       x[idx,j] = rexp(length(idx),params[[k]][j])
+    }
+  }
+  
+  output = list('x'=x,'z'=z)
+  return(output)
+}
+```
+
+
+
+```{r}
+n=100
+pi_k=c(0.4,0.3,0.3)
+params_norm <- c()
+params_norm[[1]] <- list('mu'=3,'sigma'=1)
+params_norm[[2]] <- list('mu'=15,'sigma'=4)
+params_norm[[3]] <- list('mu'=10,'sigma'=0.1)
+
+simu = simu_melange_norm(n,pi_k,params_norm)
+x=simu$x
+z=simu$z
+plot(x,col=z)
+```
+
+
+```{r}
+pi_k=c(0.4,0.6)
+params_norm_mv <- c()
+params_norm_mv[[1]] <- list('mu'=c(3,3),'sigma'=diag(2))
+params_norm_mv[[2]] <- list('mu'=c(15,15),'sigma'=matrix(c(10,5,5,8),nrow=2))
+simu = simu_melange_norm(n,pi_k,params_norm_mv)
+plot(simu$x[,1],simu$x[,2],col=simu$z)
+```
+
+```{r}
+n=20
+pi_k=c(0.4,0.4,0.2)
+params_bern <- c()
+params_bern[[1]] = c(0.9,0.9,0.9,0.5)
+params_bern[[2]] = c(0.1,0.1,0.9,0.0)
+params_bern[[3]] = c(0.1,0.9,0.5,1)
+simu_melange_bern(n,pi_k,params_bern)
+```
+
+```{r}
+n=20
+pi_k=c(0.1,0.4,0.5)
+params_pois <- c()
+params_pois[[1]] = c(1,4,4,27)
+params_pois[[2]] = c(3,4,7,7)
+params_pois[[3]] = c(5,10,4,10)
+simu_melange_pois(n,pi_k,params_pois)
+```
+
+
+```{r}
+n=20
+pi_k=c(0.1,0.4,0.5)
+params_exp <- c()
+params_exp[[1]] = c(1,4,4,27)
+params_exp[[2]] = c(3,4,7,7)
+params_exp[[3]] = c(5,10,4,10)
+simu_melange_exp(n,pi_k,params_exp)
+```
+Idée du mélange en discret : Même principe -> 1 distribution multivariée discrète, et chaque classe possède une distribution multivariée discrète différente.
+
+- Mélange de Bernouilli multivariées
+
+$f(x) = \sum_{k=1}^K \pi_k f_k(x) $ avec $f_k(x) = \prod_{j=1}^p \mathbb{B}(xj,p_{kj})$
+
+Objectif : retrouver variables cachées à partir du clustering.
+
+-> Générer un Z puis le Z défini les distributions.
+Impact du Z dans la distribution des lois, voir si ça crée des distributions totalement différentes ou identitiques.
+(genre modification dans les paramètres des lois)
+
+-> Pour le rapport : Faire une bibliographie, citer d'autres algo et aussi ajouter des stratégies aussi multi-étapes.
+(Environ 1 page : Mélange de noyaux de Mariette)
+
+
+```{r}
+z=c(rep(1,100),rep(2,100))
+n=200
+pi_k=c(0.5,0.5)
+params_norm <- c()
+params_norm[[1]] <- list('mu'=3,'sigma'=1)
+params_norm[[2]] <- list('mu'=6,'sigma'=3)
+params_bern <- c()
+params_bern[[1]] = c(0)
+params_bern[[2]] = c(1)
+
+simu_norm = simu_melange_norm(n,pi_k,params_norm,z)
+simu_bern = simu_melange_bern(n,pi_k,params_bern,z)
+X = cbind(simu_norm$x,simu_bern$x)
+
+plot(X[,1],X[,2],col=z)
+```
+
+```{r}
+for (p in 1:ncol(X))
+{
+  X[,p] = (X[,p] - mean(X[,p]))/sd(X[,p])
+}
+```
+
+
+```{r}
+res = kmeans(X,2,nstart=30)
+table(res$cluster)
+res$centers
+```
+
+
