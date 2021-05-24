@@ -37,7 +37,7 @@ grad<-function(P,args){
 ```{r}
 SCMK <- function(data,c=3,alpha=1,beta=1,gamma=1,mu=1,nb_etape=200,tol=1e-3){
     #data : tensor with dim(n,n,r) where data[:,:,k] is the kernel k on data
-    # c : number of cluster 
+    # k : number of cluster 
     
     
     # Initialisation des variables 

@@ -1,0 +1,366 @@
+---
+title: "Brouillon SCMK"
+---
+
+
+```{r}
+# Create the input vectors.
+colors = c("green","orange","blue","pink")
+kernel_names <- c("1","2","3","4")
+methodes <- c("sparse-UMKL","full-UMKL","STATIS-UMKL")
+
+# Create the matrix of the values.
+Values <- cbind(sparse_umkl$weights,full_umkl$weights,statis_umkl$weights) # le poids d'une combinaison se trouve sur une colonne.
+
+# Create the bar chart
+barplot(Values, main = "Poids des noyaux", names.arg = methodes, xlab = "Méthodes", ylab = "Pondération", col = colors)
+
+# Add the legend to the chart
+legend("topleft", kernel_names, cex = 1, fill = colors)
+```
+
+```{r}
+kernel_names <- c("1","2","3","4")
+methodes <- c("sparse-UMKL","full-UMKL","STATIS-UMKL")
+nb_methode = length(methodes)
+nb_kernels = length(kernel_names)
+
+tmp = data.frame(cbind(c(sparse_umkl$weights,full_umkl$weights,statis_umkl$weights), rep(c("sparse-UMKL","full-UMKL","STATIS-UMKL"),each=nb_kernels), rep(kernel_names,nb_methode)))
+
+colnames(tmp) <- c("valeur","Methode","Noyau")
+tmp$valeur <- as.numeric(tmp$valeur)
+ggplot(data=tmp, aes(x=Methode, y=valeur,fill=Noyau)) +
+  geom_bar(stat="identity") + ylab("Pondération")
+```
+
+
+```{r}
+library(mixKernel)
+kernel.gaussian=compute.kernel(X = as.matrix(X[,1]),kernel.func = "linear")
+kernel.bern=compute.kernel(X = as.matrix(X[,2]),kernel.func = "abundance",method="manhattan")
+image(kernel.bern$kernel)
+image(kernel.gaussian$kernel)
+```
+
+```{r}
+kernelRBF10.gaussian=compute.kernel(X = as.matrix(X[,1]),kernel.func = "gaussian.radial.basis",sigma=10)
+kernelRBF100.gaussian=compute.kernel(X = as.matrix(X[,1]),kernel.func = "gaussian.radial.basis",sigma=100)
+kernelRBF01.gaussian=compute.kernel(X = as.matrix(X[,1]),kernel.func = "gaussian.radial.basis",sigma=0.1)
+```
+
+```{r}
+sparse_umkl=combine.kernels(kernelRBF10 = kernelRBF10.gaussian, kernelRBF100= kernelRBF100.gaussian, gaussian = kernel.gaussian, bernoulli =  kernel.bern, method = "sparse-UMKL")
+
+full_umkl=combine.kernels(kernelRBF10 = kernelRBF10.gaussian, kernelRBF100= kernelRBF100.gaussian, gaussian = kernel.gaussian, bernoulli =  kernel.bern, method = "full-UMKL")
+
+statis_umkl=combine.kernels(kernelRBF10 = kernelRBF10.gaussian, kernelRBF100= kernelRBF100.gaussian, gaussian = kernel.gaussian, bernoulli =  kernel.bern, method = "STATIS-UMKL")
+```
+
+"STATIS-UMKL", "full-UMKL", "sparse-UMKL"
+
+
+
+
+
+
+```{r}
+knitr::include_graphics('SCMK - image/Noyau Polynomiale/Test/MU1e-3/Boxplot_ARI_Mu_1e-3.png')
+knitr::include_graphics('SCMK - image/Noyau Polynomiale/Test/MU1e-2/Boxplot_ARI_Mu_1e-2.png')
+knitr::include_graphics('SCMK - image/Noyau Polynomiale/Test/MU1e-1/Boxplot_ARI_Mu_1e-1.png')
+knitr::include_graphics('SCMK - image/Noyau Polynomiale/Test/MU1e0/Boxplot_ARI_Mu_1e0.png')
+knitr::include_graphics('SCMK - image/Noyau Polynomiale/Test/MU1e1/Boxplot_ARI_Mu_1e1.png')
+knitr::include_graphics('SCMK - image/Noyau Polynomiale/Test/MU1e2/Boxplot_ARI_Mu_1e2.png')
+knitr::include_graphics('SCMK - image/Noyau Polynomiale/Test/MU1e3/Boxplot_ARI_Mu_1e3.png')
+```
+
+```{r}
+cross_val <- function(X,Y,k=5){
+  # penser à la stratification
+  output <- c()
+  tmp = sample(1:nrow(X))
+  size_fold = nrow(X)/k
+  for (idx in 1:k)
+  {
+    #output[[idx]] = X[tmp[( (idx-1)*size_fold+1 ): (size_fold*idx)],]
+    output[[idx]] = tmp[( (idx-1)*size_fold+1 ): (size_fold*idx)]
+  }
+  return(output)
+}
+```
+
+
+```{r}
+score_grille_hyperparametre_SCMK_CV<-function(X,Y, c=3, range=3, mu=1e3,nb_etape=50,k=5,kernel_fun=polynomial){
+  #Penser au kernel type
+  CV = cross_val(X,k=k)
+  N_range = 2 * range + 1
+  list_res_NMI <- c()
+  list_res_rand <- c()
+  Mat_res_NMI = zeros(N_range,N_range)
+  Mat_res_rand = zeros(N_range,N_range)
+  
+  tmp_res_NMI = rep(0,k)
+  tmp_res_rand = rep(0,k)
+  for (a in -range:range){
+      for (b in -range:range){
+          for(g in -range:range){
+              print(c(a,b,g))
+              for(idx in 1:k){
+                Kernel = kernel_fun(X[ CV[[idx]], ])
+                res=SCMK(Kernel = Kernel,c=c,nb_etape=nb_etape,mu=mu,gamma =10^g,alpha=10^a,beta=10^b)
+                tmp_res_NMI[x] = NMI(as.vector(Y),as.vector(res$pred))
+                tmp_res_rand[x] =rand.index(Y,res$pred)
+              }
+              Mat_res_NMI[b+(range+1),g+(range+1)] = mean(tmp_res_NMI)
+              Mat_res_rand[b+(range+1),g+(range+1)] = mean(tmp_res_rand)
+          }
+      }
+      list_res_NMI[[a+(range+1)]]=Mat_res_NMI
+      list_res_rand[[a+(range+1)]]=Mat_res_rand
+  }
+  output = list("score_NMI" = list_res_NMI, "score_rand" = list_res_rand)
+  return(output)
+}
+```
+
+Exemple run
+
+```{r}
+affinity_self = Self_expressiveness(Kernel = Affinity_Matrix, alpha = 1e1, mu = 1e-3, nb_etape = 50, tol = 1e-3)
+res_Self_expressiveness=specc_adjacence(affinity_self$Z,c = 3)
+plot(X_train[,1],X_train[,2],col=res_Self_expressiveness)
+```
+
+```{r}
+res_SCMK = SCMK(Kernel = Affinity_Matrix,c = 3,alpha = 1,beta = 1,gamma = 1,mu = 1,nb_etape = 50,tol = 1e-3)$pred
+res_SCMK_KMEANS= SCMK_KMEANS(Kernel = Affinity_Matrix,c = 3,alpha = 1,beta =1,mu = 1,nb_etape = 50,tol = 1e-3)$pred
+affinity_self = Self_expressiveness(Kernel = Affinity_Matrix, alpha = 1e-3, mu = 1e3, nb_etape = 50, tol = 1e-3)
+res_Self_expressiveness=specc_adjacence(affinity_self$Z,c = 3)
+```
+
+```{r}
+plot(X_train[,1],X_train[,2],col=res_SCMK)
+plot(X_train[,1],X_train[,2],col=res_SCMK_KMEANS)
+plot(X_train[,1],X_train[,2],col=res_Self_expressiveness)
+```
+
+Exemple optimisation : 
+```{r}
+range = 3
+tmp=score_grille_hyperparametre_SCMK(Affinity_Matrix, Y_train, 3,range,1e3,nb_etape = 1,1)
+setup_hyperparametre_SCMK(tmp$score_rand,range)
+```
+
+```{r}
+range = 3
+tmp=score_grille_hyperparametre_SCMK_KMEANS(Affinity_Matrix, Y_train, 3,range,1e3,nb_etape = 1,1)
+setup_hyperparametre_SCMK_KMEANS(tmp$score_rand,range)
+```
+
+```{r}
+hyperparametre_Self_expressiveness(Affinity_Matrix, Y_train, 3,range=3,1e3,nb_etape = 1,1)
+```
+
+Exemple affichage boxplot :
+```{r}
+nb_test = 10
+result1= rep(0,nb_test)
+result2= rep(0,nb_test)
+for (i in 1:nb_test){
+  affinity_self = Self_expressiveness(Kernel = Affinity_Matrix, alpha = 1e-3, mu = 1e3, nb_etape = 50, tol = 1e-3)
+  res=specc_adjacence(affinity_self$Z,c = 3)
+  result1[i] = rand.index(Y_train,res)
+  result2[i] = NMI(as.vector(Y_train),as.vector(res))
+}
+```
+
+```{r}
+boxplot(cbind(result1,result2))
+```
+
+
+
+
+###
+
+```{r}
+Kernel_Matrix = polynomial(rbind(X_train,X_test),2)
+Y = c(Y_train,Y_test)
+image(x=1:((N_train+N_test)*3),y=1:((N_train+N_test)*3),z=Kernel_Matrix)
+```
+
+## Test des performances
+
+```{r}
+range = 3
+mu=1e3
+c=3
+nb_etape = 50
+nb_test = 10
+result_NMI_full<-matrix(0,nrow=nb_test,ncol = 3)
+result_NMI_test<-matrix(0,nrow=nb_test,ncol = 3)
+result_NMI_train<-matrix(0,nrow=nb_test,ncol = 3)
+result_rand_full<-matrix(0,nrow=nb_test,ncol = 3)
+result_rand_test<-matrix(0,nrow=nb_test,ncol = 3)
+result_rand_train<-matrix(0,nrow=nb_test,ncol = 3)
+```
+
+```{r}
+# Setup des hyper-paramètres
+tmp=score_grille_hyperparametre_SCMK(Kernel_Matrix_train, Y_train, 3,range,1e3,nb_etape = 1,1)
+param_SCMK_rand=setup_hyperparametre_SCMK(tmp$score_rand,range)
+param_SCMK_NMI=setup_hyperparametre_SCMK(tmp$score_NMI,range)
+
+tmp=score_grille_hyperparametre_SCMK_KMEANS(Kernel_Matrix_train, Y_train, 3,range,1e3,nb_etape = 1,1)
+param_SCMK_KMEANS_rand = setup_hyperparametre_SCMK_KMEANS(tmp$score_rand,range)
+param_SCMK_KMEANS_NMI = setup_hyperparametre_SCMK_KMEANS(tmp$score_NMI,range)
+
+param_Self=hyperparametre_Self_expressiveness(Kernel_Matrix_train, Y_train, 3,range=3,1e3,nb_etape = 1,1)
+
+# Scoring
+for (i in 1:nb_test){
+  print(i)
+  
+  #SCMK_NMI
+  res=SCMK(Kernel = Kernel_Matrix, c=c, nb_etape=nb_etape, mu=mu, alpha=param_SCMK_NMI$alpha, beta=param_SCMK_NMI$beta, gamma=param_SCMK_NMI$gamma)
+  result_NMI_full[i,1] <- NMI(as.vector(Y),as.vector(res$pred))
+  result_NMI_test[i,1] <- NMI(as.vector(Y_test),as.vector(res$pred[(3*N_train+1) : length(res$pred)]))
+  result_NMI_train[i,1] <- NMI(as.vector(Y_train),as.vector(res$pred[1:(3*N_train)]))
+  
+   #SCMK_rand
+  res=SCMK(Kernel = Kernel_Matrix, c=c, nb_etape=nb_etape, mu=mu, alpha=param_SCMK_rand$alpha, beta=param_SCMK_rand$beta, gamma=param_SCMK_rand$gamma)
+  result_rand_full[i,1] <-rand.index(Y,res$pred)
+  result_rand_test[i,1] <-rand.index(Y_test,res$pred[(3*N_train+1) : length(res$pred)])
+  result_rand_train[i,1] <-rand.index(Y_train,res$pred[1:(3*N_train)])
+  
+  #SCMK_KMEANS_NMI
+  res=SCMK_KMEANS(Kernel = Kernel_Matrix, c=c, nb_etape=nb_etape, mu=mu, alpha=param_SCMK_KMEANS_NMI$alpha, beta=param_SCMK_KMEANS_NMI$beta)
+  result_NMI_full[i,2] <- NMI(as.vector(Y),as.vector(res$pred))
+  result_NMI_test[i,2] <- NMI(as.vector(Y_test),as.vector(res$pred[(3*N_train+1) : length(res$pred)]))
+  result_NMI_train[i,2] <- NMI(as.vector(Y_train),as.vector(res$pred[1:(3*N_train)]))
+  
+   #SCMK_KMEANS_rand
+  res=SCMK_KMEANS(Kernel = Kernel_Matrix, c=c, nb_etape=nb_etape, mu=mu, alpha=param_SCMK_KMEANS_rand$alpha, beta=param_SCMK_KMEANS_rand$beta)
+  result_rand_full[i,2] <-rand.index(Y,res$pred)
+  result_rand_test[i,2] <-rand.index(Y_test,res$pred[(3*N_train+1) : length(res$pred)])
+  result_rand_train[i,2] <-rand.index(Y_train,res$pred[1:(3*N_train)])
+  
+  #Self_expressiveness_NMI
+  affinity_self = Self_expressiveness(Kernel = Kernel_Matrix, alpha = param_Self$alpha_NMI, mu = mu, nb_etape = nb_etape, tol = 1e-3)
+  res = specc_adjacence(affinity_self$Z,c = c)
+  result_NMI_full[i,3] <- NMI(as.vector(Y),as.vector(res))
+  result_NMI_test[i,3] <- NMI(as.vector(Y_test),as.vector(res[(3*N_train+1) : length(res)]))
+  result_NMI_train[i,3] <- NMI(as.vector(Y_train),as.vector(res[1:(3*N_train)]))
+  
+  #Self_expressiveness_rand
+  affinity_self = Self_expressiveness(Kernel = Kernel_Matrix, alpha = param_Self$alpha_rand, mu = mu, nb_etape = nb_etape, tol = 1e-3)
+  res = specc_adjacence(affinity_self$Z,c = c)
+  result_rand_full[i,3] <-rand.index(Y,res)
+  result_rand_test[i,3] <-rand.index(Y_test,res[(3*N_train+1) : length(res)])
+  result_rand_train[i,3] <-rand.index(Y_train,res[1:(3*N_train)])
+}
+```
+
+```{r}
+#png("aze.jpg",height=700,width=700,res=140)
+#dev.off()
+boxplot(result_NMI_full)
+boxplot(result_NMI_test)
+boxplot(result_NMI_train)
+boxplot(result_rand_full)
+boxplot(result_rand_test)
+boxplot(result_rand_train)
+
+```
+
+
+```{r}
+trace(ortho_optim,edit=TRUE)
+```
+
+```{r}
+setwd("/Users/trystanwolff/desktop/SCMK - image/Single Kernel/Train")
+```
+
+
+
+## Essais parallélisation
+
+
+```{r}
+library(foreach)
+library(doParallel)
+```
+
+```{r}
+library(microbenchmark)
+library(parallel)
+library(foreach)
+library(doParallel)
+
+log_par <- function(x){
+  Ncpus <- parallel::detectCores() - 1
+  cl <- cl <- parallel::makeCluster(Ncpus, setup_strategy = "sequential")
+  doParallel::registerDoParallel(cl)
+  res <- foreach(i=1:length(x), .combine='c') %dopar% {
+    log(x[i])
+  }
+  parallel::stopCluster(cl)
+  return(res)
+}
+
+log_seq <- function(x){
+  # try this yourself (spoiler alert: it is quite long...):
+  # res <- numeric(length(x))
+  # for(i in 1:length(x)){
+  #   res[i] <- log(x[i])
+  # }
+  # return(res)
+  return(log(x))
+}
+
+mb <- microbenchmark(log_par(1:100), log_seq(1:100), times=10)
+```
+
+
+```{r}
+
+tmp1=compute.kernel(X_test,kernel.func = 'linear')
+tmp2=compute.kernel(X_test,kernel.func = 'gaussian.radial.basis')
+meta.kernel <- combine.kernels(kernel1 = tmp1, kernel2 = tmp2, method = "full-UMKL")
+meta.kernel$weights
+```
+
+```{r}
+polynomial<-function(X,deg=1){
+  n=nrow(X)
+  res=matrix(0,n,n)
+  for(i in 1:n){
+    for(j in 1:n){
+      res[i,j]=(t(X[i,])%*%X[j,]+1)^deg
+    }
+  }
+  return(res)
+}
+
+polynomial_par<-function(X,deg=1){
+  n=nrow(X)
+  res=matrix(0,n,n)
+  for(i in 1:n){
+    for(j in 1:n){
+      res[i,j]=(t(X[i,])%*%X[j,]+1)^deg
+    }
+  }
+  Ncpus <- parallel::detectCores() - 1
+  cl <- parallel::makeCluster(Ncpus, setup_strategy = "sequential")
+  doParallel::registerDoParallel(cl)
+  res <- foreach(i=1:ncol(X), j=1:ncol(X), .combine='c') %dopar% {
+    (t(X[i,])%*%X[j,]+1)^deg
+  }
+  parallel::stopCluster(cl)
+  return(res)
+}
+
+mb <- microbenchmark(polynomial(X_train,2), polynomial_par(X_train,2), times=10)
+```
+
