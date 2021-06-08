@@ -12,6 +12,7 @@ csl : chicago-author-date-16th-edition.csl
 ---
 
 
+
 # 1. Principe :
 
 Le Spectral Clustering with Multiple Kernels (SCMK) [@kang_unified_nodate] est une méthode de clustering utilisant à la fois le spectral clustering, et la création d'une matrice d'affinité. Cette combinaison a pour objectif d'améliorer les performances de spectral clustering classique.  
@@ -133,7 +134,7 @@ Bien que cette écriture soit formelle, il est nécessaire de réécrire les deu
 <Y,\ S-Z>_F +\frac{\mu}{2}||S-Z||^2_F &= \frac{\mu}{2}||S-Z||^2_F + <Y,\ S-Z>_F  + \frac{1}{2\mu} ||Y||^2_F - \frac{1}{2\mu} ||Y||^2_F \\
 &=\frac{\mu}{2} \left(  ||S-Z||^2_F + \frac{2}{\mu} <Y,\ S-Z>_F + \frac{1}{\mu^2} ||Y||^2_F\right) - \frac{1}{2\mu} ||Y||^2_F \\
 &=\frac{\mu}{2} \left(  ||S-Z||^2_F + 2 <\frac{Y}{\mu} ,\ S-Z>_F + ||\frac{Y}{\mu}||^2_F\right) - \frac{1}{2\mu} ||Y||^2_F \\
-&=\frac{\mu}{2} ||S-Z +\frac{Y}{\mu}||^2_F - \frac{1}{2\mu} ||Y||_F \ . \\
+&=\frac{\mu}{2} ||S-Z +\frac{Y}{\mu}||^2_F - \frac{1}{2\mu} ||Y||_F^2 \ . \\
 \end{split}
 \end{equation*}
 
