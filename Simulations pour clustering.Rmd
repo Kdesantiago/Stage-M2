@@ -5,13 +5,23 @@ output:
 ---
 
 ```{r}
-library(mvtnorm)
+rm(list=ls())
 ```
 
+# Chargement des librairies
+
+```{r}
+library(mvtnorm)
+library(DirichletReg)
+```
+
+# Simulation de mélanges
+
+## Loi normales
 ```{r}
 simu_melange_norm <-function(n,pi_k,params,z=NULL){
   # Paramètres
-  K = length(pi_k) #nombre de classes
+  K = length(pi_k) #nombre de modalités
   p = length(params[[1]]$mu) #nombre de variables à simuler
   
   # Si les groupes sont pas déjà définis, en choisi aléatoirement.
@@ -19,9 +29,9 @@ simu_melange_norm <-function(n,pi_k,params,z=NULL){
     z = sample(1:K,n,replace=TRUE,prob=pi_k)
   }
   
-  # Si le nombre d'individu de Z est différent de celui que l'on veut générer
+  # Si le nombre d'individu de z est différent de celui que l'on veut générer
   if(length(z)!=n) {
-    warning("Différence de taille entre n et Z, Z a été pris comme référence")
+    warning("Différence de taille entre n et z, z a été pris comme référence")
     n=length(z)
   }
   
@@ -37,7 +47,30 @@ simu_melange_norm <-function(n,pi_k,params,z=NULL){
 }
 ```
 
+```{r}
+n=100
+pi_k=c(0.4,0.3,0.3)
+params_norm <- c()
+params_norm[[1]] <- list('mu'=3,'sigma'=1)
+params_norm[[2]] <- list('mu'=15,'sigma'=4)
+params_norm[[3]] <- list('mu'=10,'sigma'=0.1)
 
+simu = simu_melange_norm(n,pi_k,params_norm)
+x=simu$x
+z=simu$z
+plot(x,col=z)
+```
+
+```{r}
+pi_k=c(0.4,0.6)
+params_norm_mv <- c()
+params_norm_mv[[1]] <- list('mu'=c(3,3),'sigma'=diag(2))
+params_norm_mv[[2]] <- list('mu'=c(15,15),'sigma'=matrix(c(10,5,5,8),nrow=2))
+simu = simu_melange_norm(n,pi_k,params_norm_mv)
+plot(simu$x[,1],simu$x[,2],col=simu$z)
+```
+
+## Loi de Bernoulli
 ```{r}
 simu_melange_bern <-function(n,pi_k,params,z=NULL){
   
@@ -50,9 +83,9 @@ simu_melange_bern <-function(n,pi_k,params,z=NULL){
     z = sample(1:K,n,replace=TRUE,prob=pi_k)
   }
   
-  # Si le nombre d'individu de Z est différent de celui que l'on veut générer
+  # Si le nombre d'individu de z est différent de celui que l'on veut générer
   if(length(z)!=n) {
-    warning("Différence de taille entre n et Z, Z a été pris comme référence")
+    warning("Différence de taille entre n et z, z a été pris comme référence")
     n=length(z)
   }
   
@@ -71,6 +104,24 @@ simu_melange_bern <-function(n,pi_k,params,z=NULL){
 }
 ```
 
+Surparamétrisation ? A voir.
+-> La médiane
+-> La variance
+Intérêt -> Simulation, plus parlant d'avoir des 0/1 sur la structures des matrices.
+
+
+```{r}
+n=20
+pi_k=c(0.4,0.4,0.2)
+params_bern <- c()
+params_bern[[1]] = c(0.9,0.9,0.9,0.5)
+params_bern[[2]] = c(0.1,0.1,0.9,0.0)
+params_bern[[3]] = c(0.1,0.9,0.5,1)
+x=simu_melange_bern(n,pi_k,params_bern)$x
+```
+
+
+## Loi de poisson
 ```{r}
 simu_melange_pois <-function(n,pi_k,params,z=NULL){
   
@@ -83,9 +134,9 @@ simu_melange_pois <-function(n,pi_k,params,z=NULL){
     z = sample(1:K,n,replace=TRUE,prob=pi_k)
   }
   
-  # Si le nombre d'individu de Z est différent de celui que l'on veut générer
+  # Si le nombre d'individu de z est différent de celui que l'on veut générer
   if(length(z)!=n) {
-    warning("Différence de taille entre n et Z, Z a été pris comme référence")
+    warning("Différence de taille entre n et z, z a été pris comme référence")
     n=length(z)
   }
   
@@ -105,6 +156,17 @@ simu_melange_pois <-function(n,pi_k,params,z=NULL){
 ```
 
 ```{r}
+n=20
+pi_k=c(0.1,0.4,0.5)
+params_pois <- c()
+params_pois[[1]] = c(1,4,4,27)
+params_pois[[2]] = c(3,4,7,7)
+params_pois[[3]] = c(5,10,4,10)
+simu_melange_pois(n,pi_k,params_pois)
+```
+
+## Loi exponentielle
+```{r}
 simu_melange_exp <-function(n,pi_k,params,z=NULL){
   
   #Paramètres
@@ -116,9 +178,9 @@ simu_melange_exp <-function(n,pi_k,params,z=NULL){
     z = sample(1:K,n,replace=TRUE,prob=pi_k)
   }
   
-  # Si le nombre d'individu de Z est différent de celui que l'on veut générer
+  # Si le nombre d'individu de z est différent de celui que l'on veut générer
   if(length(z)!=n) {
-    warning("Différence de taille entre n et Z, Z a été pris comme référence")
+    warning("Différence de taille entre n et z, z a été pris comme référence")
     n=length(z)
   }
   
@@ -137,108 +199,371 @@ simu_melange_exp <-function(n,pi_k,params,z=NULL){
 }
 ```
 
-
-
-```{r}
-n=100
-pi_k=c(0.4,0.3,0.3)
-params_norm <- c()
-params_norm[[1]] <- list('mu'=3,'sigma'=1)
-params_norm[[2]] <- list('mu'=15,'sigma'=4)
-params_norm[[3]] <- list('mu'=10,'sigma'=0.1)
-
-simu = simu_melange_norm(n,pi_k,params_norm)
-x=simu$x
-z=simu$z
-plot(x,col=z)
-```
-
-
-```{r}
-pi_k=c(0.4,0.6)
-params_norm_mv <- c()
-params_norm_mv[[1]] <- list('mu'=c(3,3),'sigma'=diag(2))
-params_norm_mv[[2]] <- list('mu'=c(15,15),'sigma'=matrix(c(10,5,5,8),nrow=2))
-simu = simu_melange_norm(n,pi_k,params_norm_mv)
-plot(simu$x[,1],simu$x[,2],col=simu$z)
-```
-
 ```{r}
 n=20
-pi_k=c(0.4,0.4,0.2)
-params_bern <- c()
-params_bern[[1]] = c(0.9,0.9,0.9,0.5)
-params_bern[[2]] = c(0.1,0.1,0.9,0.0)
-params_bern[[3]] = c(0.1,0.9,0.5,1)
-simu_melange_bern(n,pi_k,params_bern)
-```
-
-```{r}
-n=20
-pi_k=c(0.1,0.4,0.5)
-params_pois <- c()
-params_pois[[1]] = c(1,4,4,27)
-params_pois[[2]] = c(3,4,7,7)
-params_pois[[3]] = c(5,10,4,10)
-simu_melange_pois(n,pi_k,params_pois)
-```
-
-
-```{r}
-n=20
-pi_k=c(0.1,0.4,0.5)
+pi_k=c(0.2,0.4,0.4)
 params_exp <- c()
 params_exp[[1]] = c(1,4,4,27)
 params_exp[[2]] = c(3,4,7,7)
 params_exp[[3]] = c(5,10,4,10)
 simu_melange_exp(n,pi_k,params_exp)
 ```
-Idée du mélange en discret : Même principe -> 1 distribution multivariée discrète, et chaque classe possède une distribution multivariée discrète différente.
 
-- Mélange de Bernouilli multivariées
+# Simulation états cachés : identiques, indépendants, dépendants.
 
-$f(x) = \sum_{k=1}^K \pi_k f_k(x) $ avec $f_k(x) = \prod_{j=1}^p \mathbb{B}(xj,p_{kj})$
+## Fonction
 
-Objectif : retrouver variables cachées à partir du clustering.
+On distingue 3 cas :
+- 'same' : les deux variables cachées $z_1$ et $z_2$ contiennent exactement la même information.
+- 'independant' : les deux variables cachées ne dépendant pas l'une de l'autre. La distribution de la variable $z_2$ ne dépend pas de celle de $z_1$.
+- 'conditionnel' : La variable $z_2$ dépend de la variable $z_1$. La distribution de la variable $z_2$ dépend de celle de $z_1$ et de sa réalisation.
 
--> Générer un Z puis le Z défini les distributions.
-Impact du Z dans la distribution des lois, voir si ça crée des distributions totalement différentes ou identitiques.
-(genre modification dans les paramètres des lois)
+Ci-dessous, il y a 2 deux méthodes différentes pour générer des réalisations de $z_1$ et $z_2$ par le cas conditionnel.
+Tout d'abord, on simule les $z_1$ par une multinomial de paramètre $\pi_{k_1}$, puis on peut simuler les $z_2$ de deux manières :
+- 'conditionnel_1' : on génère les $z_2$ par une loi de dirichlet de paramètre $z_1 + \alpha$ où alpha est un paramètre qui contrôle le lien entre les $z_1$ et les $z_2$. Plus alpha est petit, plus la probabilité que $z_1 = z_2$ est grande.
 
--> Pour le rapport : Faire une bibliographie, citer d'autres algo et aussi ajouter des stratégies aussi multi-étapes.
-(Environ 1 page : Mélange de noyaux de Mariette)
+- 'conditionnel_2' : on génère les $z_2$ aussi par une loi de dirichlet mais de paramètre $\alpha z_1 + (1-\alpha)\pi_{k_2}$. Cette fois-ci on contrôle la distribution par une combinaison convexe d'une réalisation $z_1$ avec un vecteur de probabilité $\pi_{k_2}$. Plus alpha est grand, plus la probabilité que $z_1 = z_2$ est grande.
 
+Puis on associe à $z_1$ et $z_2$ l'indice qui maximise.
 
-```{r}
-z=c(rep(1,100),rep(2,100))
-n=200
-pi_k=c(0.5,0.5)
-params_norm <- c()
-params_norm[[1]] <- list('mu'=3,'sigma'=1)
-params_norm[[2]] <- list('mu'=6,'sigma'=3)
-params_bern <- c()
-params_bern[[1]] = c(0)
-params_bern[[2]] = c(1)
-
-simu_norm = simu_melange_norm(n,pi_k,params_norm,z)
-simu_bern = simu_melange_bern(n,pi_k,params_bern,z)
-X = cbind(simu_norm$x,simu_bern$x)
-
-plot(X[,1],X[,2],col=z)
-```
+La deuxième version du cas conditionnel à l'avantage de pouvoir se généraliser, en prenant pas seulement en compte 1 état caché mais possiblement plusieurs.
 
 ```{r}
-for (p in 1:ncol(X))
-{
-  X[,p] = (X[,p] - mean(X[,p]))/sd(X[,p])
+simu_etat_cache <- function(...,n=50,methode="same",alpha=NULL){
+  tmp=list(...)
+  
+  if(methode == "independant") 
+  { # pas de condition du même nombre de modalités
+    pi_k1 = tmp[[1]]
+    pi_k2 = tmp[[2]]
+    
+    K1 = length(pi_k1)
+    K2 = length(pi_k2)
+    
+    z1 = sample(1:K1,n,replace=TRUE,prob=pi_k1)
+    z2 = sample(1:K2,n,replace=TRUE,prob=pi_k2)
+  }
+  
+  if(methode == "same")
+  {
+    pi_k1 = tmp[[1]]
+    K = length(pi_k1)
+    z1 = sample(1:K,n,replace=TRUE,prob=pi_k1)
+    z2 = z1
+
+  }
+  
+  if(methode == "conditionnel_1")
+  { # condition du même nombre de modalités
+    pi_k1 = tmp[[1]]
+    K1 = length(pi_k1)
+    z1 = t(rmultinom(n,size=1,prob=pi_k1))
+    z2 = t(sapply(seq_len(nrow(z1)), function(i) rdirichlet(1,z1[i,]+alpha )))
+    
+    z1 = max.col(z1)
+    z2 = max.col(z2)
+  }
+
+  if(methode == "conditionnel_2")
+  { # condition du même nombre de modalités
+    pi_k1 = tmp[[1]]
+    pi_k2 = tmp[[2]]
+    
+    K1 = length(pi_k1)
+    K2 = length(pi_k2)
+    z1 = t(rmultinom(n,size=1,prob=pi_k1))
+    z2 = t(sapply(seq_len(nrow(z1)), function(i) rdirichlet(1,z1[i,]*alpha + (1-alpha)*pi_k2)))
+    
+    z1 = max.col(z1)
+    z2 = max.col(z2)
+  }
+  output = list("z1" = z1,"z2" = z2)
+  return(output)
 }
 ```
 
 
+## Exemple de différentes simulation d'états cachés :
+
+
 ```{r}
-res = kmeans(X,2,nstart=30)
-table(res$cluster)
-res$centers
+n=1000
+pi_k1=c(0.7,0.3)
+pi_k2=c(0.1,0.9)
 ```
 
+### Identique
+
+```{r}
+res=table(simu_etat_cache(pi_k1,n=n,methode = "same"))
+print(res)
+```
+
+```{r}
+res=table(simu_etat_cache(pi_k2,n=n,methode = "same"))
+print(res)
+```
+
+### Indépendant
+```{r}
+res=table(simu_etat_cache(pi_k1,pi_k2,n=n,methode = "independant"))
+print(res) # Simulations
+```
+
+
+```{r}
+print(matrix(c(pi_k1[1] * pi_k2[1],pi_k1[1] * pi_k2[2],pi_k1[2] * pi_k2[1],pi_k1[2] * pi_k2[2]),byrow = TRUE, nrow=2)) 
+print(res/n) # Estimation P(z1,z2)
+```
+
+Dans le cas indépendant, $\mathbb{P}(z_1,z_2) = \mathbb{P}(z_1) \mathbb{P}(z_2)$ donc, on a bien l'estimation qui tend vers le produit des probabilités. 
+
+```{r}
+print(rowSums(res)/n) # estimation de pi_k1
+print(colSums(res)/n) # estimation de pi_k2
+```
+
+### Conditionnel
+
+
+```{r}
+res=table(simu_etat_cache(pi_k1,pi_k2,n=n,methode = "conditionnel_2",alpha=0.01))
+print(res)
+print(res/n) # Estimation P(z1,z2)
+```
+
+Avec la méthode "conditionnel_2", et un alpha très petit, $\mathbb{P}(z_1,z_2) $ est tend vers $\mathbb{P}(z_1) \mathbb{P}(z_2)$. 
+
+```{r}
+res=table(simu_etat_cache(pi_k1,pi_k2,n=n,methode = "conditionnel_2",alpha=0.50))
+print(res)
+print(res/n) # Estimation P(z1,z2)
+```
+
+Avec un alpha moyen, $\mathbb{P}(z_1,z_2) $ n'est ni proche du cas indépendant ($\mathbb{P}(z_1) \mathbb{P}(z_2)$) ni du cas identique. Il s'agit d'un cas intermédiaire où $z_{1}$ a une influence sur $z_{2}$, mais où $\pi_{k_2}$ intervient aussi sur la distribution de $z_{2}$.
+
+```{r}
+res=table(simu_etat_cache(pi_k1,pi_k2,n=n,methode = "conditionnel_2",alpha=0.99))
+print(res)
+print(res/n) # Estimation P(z1,z2)
+```
+
+Avec alpha très proche de 1, on retrouve un cas tendant vers celui de l'identique, où pour tous les individus $z_{1} =  z_{2}$.
+
+
+## Impact sur la simulation de données
+
+```{r}
+n=1000
+pi_k1=c(0.7,0.3)
+pi_k2=c(0.2,0.8)
+params_norm <- c()
+params_norm[[1]] <- list('mu'=3,'sigma'=1)
+params_norm[[2]] <- list('mu'=10,'sigma'=1)
+```
+
+### état cachés identiques
+
+```{r}
+z=simu_etat_cache(pi_k1,n=n,methode = "same")
+simu_norm1 = simu_melange_norm(n,pi_k1,params_norm,z=z$z1)
+simu_norm2 = simu_melange_norm(n,pi_k2,params_norm,z=z$z2)
+X = cbind(simu_norm1$x,simu_norm2$x)
+
+plot(X[,1],X[,2])
+table(z$z1,z$z2)
+```
+
+### état cachés indépendants
+
+```{r}
+z=simu_etat_cache(pi_k1,pi_k2,n=n,methode = "independant")
+simu_norm1 = simu_melange_norm(n,pi_k1,params_norm,z=z$z1)
+simu_norm2 = simu_melange_norm(n,pi_k2,params_norm,z=z$z2)
+X = cbind(simu_norm1$x,simu_norm2$x)
+
+plot(X[,1],X[,2])
+table(z$z1,z$z2)
+```
+
+### état cachés dépendants
+
+```{r}
+alpha=0.5
+z=simu_etat_cache(pi_k1,pi_k2,n=n,methode = "conditionnel_2",alpha=alpha)
+simu_norm1 = simu_melange_norm(n,pi_k1,params_norm,z=z$z1)
+simu_norm2 = simu_melange_norm(n,pi_k2,params_norm,z=z$z2)
+X = cbind(simu_norm1$x,simu_norm2$x)
+
+plot(X[,1],X[,2])
+table(z$z1,z$z2)
+```
+
+
+# Difficulté du clustering
+
+## Fonctions : prediction états cachés a posteriori.
+```{r}
+prediction_melange_norm<-function(X,alpha,pi_k1,pi_k2,params_norm1, params_norm2=params_norm1,idx_var_grp1=1,idx_var_grp2=2){
+  n=nrow(X)
+  K1 = length(params_norm1)
+  K2 = length(params_norm2)
+  gamma = matrix(0,nrow = n, ncol = K1*K2)
+  idx_z <- c()
+  for (k1 in 1:K1){
+    for (k2 in 1:K2){
+      idx_z[[K1 * (k1-1) + k2]] <- c(k1,k2)
+      tmp_k2 = rep(0.01,K2)
+      tmp_k2[k2] = rep(1-0.01*(K2-1))
+      
+      tmp_k1 = rep(0,K1)
+      tmp_k1[k1] = 1
+      
+      gamma[,K1 * (k1-1) + k2] = sapply(seq_len(n), function(i) pi_k1[k1] * dmvnorm(X[i,idx_var_grp1], mean = params_norm1[[k1]]$mu, sigma = matrix(params_norm1[[k1]]$sigma)) * ddirichlet(matrix(tmp_k2,nrow=1),tmp_k1*alpha + (1-alpha)*pi_k2) * dmvnorm(X[i,idx_var_grp2], mean = params_norm2[[k2]]$mu, sigma = matrix(params_norm2[[k2]]$sigma)))
+      
+    }
+  }
+  pred=max.col(gamma)
+  z1 = sapply(seq_len(n), function(i) idx_z[[pred[i]]][1])
+  z2 = sapply(seq_len(n), function(i) idx_z[[pred[i]]][2])
+  output=list('z1' = z1, 'z2' = z2)
+  return(output)
+}
+```
+
+```{r}
+prediction_melange_norm_bern<-function(X,alpha,pi_k1,pi_k2,params_norm, params_bern,idx_var_norm=1,idx_var_bern=2){
+  n=nrow(X)
+  K1 = length(params_norm)
+  K2 = length(params_bern)
+  gamma = matrix(0,nrow = n, ncol = K1*K2)
+  idx_z <- c()
+  for (k1 in 1:K1){
+    for (k2 in 1:K2){
+      idx_z[[K1 * (k1-1) + k2]] <- c(k1,k2)
+      tmp_k2 = rep(0.01,K2)
+      tmp_k2[k2] = rep(1-0.01*(K2-1))
+      
+      tmp_k1 = rep(0,K1)
+      tmp_k1[k1] = 1
+      
+      gamma[,K1 * (k1-1) + k2] = sapply(seq_len(n), function(i) pi_k1[k1] * dmvnorm(X[i,idx_var_norm], mean = params_norm[[k1]]$mu, sigma = matrix(params_norm[[k1]]$sigma)) * ddirichlet(matrix(tmp_k2,nrow=1),tmp_k1*alpha + (1-alpha)*pi_k2) * prod(dbinom(X[i,idx_var_bern],size=1,prob=params_bern[[k2]])) )
+      
+    }
+  }
+  pred=max.col(gamma)
+  z1 = sapply(seq_len(n), function(i) idx_z[[pred[i]]][1])
+  z2 = sapply(seq_len(n), function(i) idx_z[[pred[i]]][2])
+  output=list('z1' = z1, 'z2' = z2)
+  return(output)
+}
+```
+
+```{r}
+score_prediction_cache<-function(z_true,z_pred){
+  res = mean(sapply(seq_len(length(z_pred$z1)), function(i) (z_pred$z1[i]==z_true$z1[i]) & (z_pred$z2[i]==z_true$z2[i])))
+  return(res)
+}
+```
+
+## Exemple 2 gaussiennes :
+
+```{r}
+n=1000
+pi_k1=c(0.7,0.3)
+pi_k2=c(0.2,0.8)
+alpha=0.5
+params_norm <- c()
+params_norm[[1]] <- list('mu'=3,'sigma'=1)
+params_norm[[2]] <- list('mu'=10,'sigma'=3)
+
+z=simu_etat_cache(pi_k1,pi_k2,n=n,methode = "conditionnel_2",alpha=alpha)
+simu_norm1 = simu_melange_norm(n,pi_k1,params_norm,z=z$z1)
+simu_norm2 = simu_melange_norm(n,pi_k2,params_norm,z=z$z2)
+X = cbind(simu_norm1$x,simu_norm2$x)
+
+plot(X[,1],X[,2])
+table(z$z1,z$z2)
+```
+
+```{r}
+pred=prediction_melange_norm(X,alpha,pi_k1,pi_k2,params_norm)
+table(pred)
+score_prediction_cache(z,pred)
+```
+
+
+## Exemple Normal/Bernoulli
+
+```{r}
+n=1000
+pi_k1=c(0.7,0.3)
+pi_k2=c(0.2,0.8)
+params_norm <- c()
+params_norm[[1]] <- list('mu'=3,'sigma'=1)
+params_norm[[2]] <- list('mu'=8,'sigma'=3)
+params_bern <- c()
+params_bern[[1]] = c(0.2,0.9,0.3)
+params_bern[[2]] = c(0.7,0.1,0.9)
+
+alpha=0.5
+z=simu_etat_cache(pi_k1,pi_k2,n=n,methode = "conditionnel_2",alpha=alpha)
+simu_norm = simu_melange_norm(n,pi_k1,params_norm,z$z1)
+simu_bern = simu_melange_bern(n,pi_k2,params_bern,z$z2)
+X = cbind(simu_norm$x,simu_bern$x)
+
+plot(X[,1],X[,2])
+table(z)
+```
+
+
+
+
+### 1 variable de bernoulli
+
+```{r}
+pred=prediction_melange_norm_bern(X,alpha,pi_k1,pi_k2,params_norm,params_bern,idx_var_bern = 2)
+table(pred)
+score_prediction_cache(z,pred)
+```
+
+```{r}
+pred=prediction_melange_norm_bern(X,alpha,pi_k1,pi_k2,params_norm,params_bern,idx_var_bern = 3)
+table(pred)
+score_prediction_cache(z,pred)
+```
+
+```{r}
+pred=prediction_melange_norm_bern(X,alpha,pi_k1,pi_k2,params_norm,params_bern,idx_var_bern = 4)
+table(pred)
+score_prediction_cache(z,pred)
+```
+
+### 2 variables de bernoulli
+
+```{r}
+pred=prediction_melange_norm_bern(X,alpha,pi_k1,pi_k2,params_norm,params_bern,idx_var_bern = 2:3)
+table(pred)
+score_prediction_cache(z,pred)
+```
+
+```{r}
+pred=prediction_melange_norm_bern(X,alpha,pi_k1,pi_k2,params_norm,params_bern,idx_var_bern = c(2,4))
+table(pred)
+score_prediction_cache(z,pred)
+```
+
+```{r}
+pred=prediction_melange_norm_bern(X,alpha,pi_k1,pi_k2,params_norm,params_bern,idx_var_bern = 3:4)
+table(pred)
+score_prediction_cache(z,pred)
+```
+
+### 3 variables de bernoulli
+
+```{r}
+pred=prediction_melange_norm_bern(X,alpha,pi_k1,pi_k2,params_norm,params_bern,idx_var_bern = 2:4)
+table(pred)
+score_prediction_cache(z,pred)
+```
 
